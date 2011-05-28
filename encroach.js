@@ -102,6 +102,11 @@ Board.prototype.display = function () {
 	}
 }
 
+Board.prototype.drawSquare = function (x,y) {
+			ctx.fillStyle = pallet[this.grid[y][x].colour];
+			ctx.fillRect(x*xsize,y*ysize + offy,xsize,ysize);
+}
+
 Board.prototype.move = function (playerNum, colour) {
 	if (canMove == false){
 		return;
@@ -109,7 +114,7 @@ Board.prototype.move = function (playerNum, colour) {
 	canMove =false;
 	if (colour == null){
 		colour = Math.floor(Math.random()*6);
-		while (colour == players[0].colour && colour == players[1].colour){
+		while (colour == players[0].colour || colour == players[1].colour){
 			colour = Math.floor(Math.random()*6);
 		}
 	}
@@ -120,7 +125,7 @@ Board.prototype.move = function (playerNum, colour) {
 	check.push(new Coord(players[playerNum].x,players[playerNum].y));
 
 	console.log('inside move', check);
-	temp();			
+	flood();			
 
 }
 
@@ -155,14 +160,15 @@ function canChange (c, owned) {
 	return false;
 }
 
-function temp () {
-	console.log("temp has been called", check);
+function flood () {
+	console.log("flood has been called", check);
 	var count = check.length;
 	while (count > 0){
 		var current = check.shift();
 		var c;
 		board.grid[current.y][current.x].colour = newColour;
 		board.grid[current.y][current.x].marked = true;
+		board.drawSquare(current.x,current.y);
 		var owned = false;
 		if (board.grid[current.y][current.x].owner == workingPlayer){
 			owned = true;
@@ -189,17 +195,16 @@ function temp () {
 		}
 		count--;
 	}
-	board.display();
 	if (check.length > 0){
 		console.log('setTimeout called', check);
-		setTimeout(temp,25);
+		setTimeout(flood,25);
 	}else{
-		console.log('temp2', check, 'length', check.length);
-		temp2();
+		console.log('aftermath', check, 'length', check.length);
+		aftermath();
 	}
 }
 
-function temp2() {
+function aftermath() {
 	players[workingPlayer].colour = newColour;
 	board.ownMarked(workingPlayer);
 	canMove = true;

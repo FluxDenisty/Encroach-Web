@@ -1,6 +1,6 @@
 <html>
   <head>
-    <title>Canvas tutorial template</title>
+    <title>Encroach-Web</title>
 		<link type="text/css" rel="stylesheet" href="encroach.css">
 		<script type="text/javascript" src="encroach.js"></script>
 		<script type="text/javascript" src="../js/jQuery.js"></script>
