@@ -8,7 +8,7 @@ var pallet = ["red","blue","green","orange","yellow","purple"];
 //Global Vars
 var board;
 var players = [];
-var check = [];
+var floodQueue = [];
 var oldColour;
 var nextColour;
 var workingPlayer;
@@ -122,9 +122,9 @@ Board.prototype.move = function (playerNum, colour) {
 	oldColour = players[playerNum].colour;
 	newColour = colour;
 	workingPlayer = playerNum;
-	check.push(new Coord(players[playerNum].x,players[playerNum].y));
+	floodQueue.push(new Coord(players[playerNum].x,players[playerNum].y));
 
-	console.log('inside move', check);
+	console.log('inside move', floodQueue);
 	flood();			
 
 }
@@ -161,10 +161,10 @@ function canChange (c, owned) {
 }
 
 function flood () {
-	console.log("flood has been called", check);
-	var count = check.length;
+	console.log("flood has been called", floodQueue);
+	var count = floodQueue.length;
 	while (count > 0){
-		var current = check.shift();
+		var current = floodQueue.shift();
 		var c;
 		board.grid[current.y][current.x].colour = newColour;
 		board.grid[current.y][current.x].marked = true;
@@ -175,31 +175,31 @@ function flood () {
 		}
 		c = new Coord(current.x+1,current.y);
 		if (canChange(c, owned)){
-			check.push(c);
+			floodQueue.push(c);
 			board.grid[c.y][c.x].marked = true;
 		}
 		c = new Coord(current.x,current.y+1);
 		if (canChange(c, owned)){
-			check.push(c);
+			floodQueue.push(c);
 			board.grid[c.y][c.x].marked = true;
 		}
 		c = new Coord(current.x-1,current.y);
 		if (canChange(c, owned)){
-			check.push(c);
+			floodQueue.push(c);
 			board.grid[c.y][c.x].marked = true;
 		}
 		c = new Coord(current.x,current.y-1);
 		if (canChange(c, owned)){
-			check.push(c);
+			floodQueue.push(c);
 			board.grid[c.y][c.x].marked = true;
 		}
 		count--;
 	}
-	if (check.length > 0){
-		console.log('setTimeout called', check);
-		setTimeout(flood,25);
+	if (floodQueue.length > 0){
+		console.log('setTimeout called', floodQueue);
+		setTimeout(flood,15);
 	}else{
-		console.log('aftermath', check, 'length', check.length);
+		console.log('aftermath', floodQueue, 'length', floodQueue.length);
 		aftermath();
 	}
 }
@@ -214,6 +214,6 @@ function aftermath() {
 		} else {
 			workingPlayer = 1;
 		}
-		setTimeout(function() { board.move(workingPlayer); }, 50);
+		setTimeout(function() { board.move(workingPlayer); }, 10);
 	}
 }
