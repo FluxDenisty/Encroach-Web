@@ -3,25 +3,57 @@ var ctx;
 var xsize = 20;
 var ysize = 20;
 var offy = 0;
-var pallet = ["red","blue","green","orange","yellow","purple"];
+//var pallet = ["#FF0000","#0000FF","#00C200","#FF8000","#FFFF00","#8A00B8"];
+var pallet = ["#0000C7","#C700C7","#C70000","#C7C700","#00C700","#00C7C7"];
+var drawQueue = [];
 
 //Global Vars
-var board;
-var players = [];
-var floodQueue = [];
-var oldColour;
-var nextColour;
-var workingPlayer;
-var canMove = true;
-var repeater = true;
+var game = {
+	board:null,
+	players : [],
+	floodQueue : [],
+	oldColour:null,
+	nextColour:null,
+	workingPlayer:0,
+	canMove : true,
+	repeater : false
+};
+/* * * * * * * * * * * * * * *
+ * Initialization functions  *
+ * * * * * * * * * * * * * * */
+function init() {
+	var canvas = $('#canvas').get(0);
+	if (!canvas.getContext){
+		return;
+	}
+	ctx = canvas.getContext('2d');
+	game.board = new Board(25,15);
+	game.players[0] = new Player("Ryan",0);
+	game.players[1] = new Player(null,1);
+	display();
+	//game.board.move(0);
+}
 
+/* * * * * * * * * * * *
+ * Object Declarations *
+ * * * * * * * * * * * */
 function Coord (x,y) {
 	this.x = x;
 	this.y = y;
 	this.valid = true;
-	if (x < 0 || x >= board.sizex || y < 0 || y >= board.sizey){
+	if (x < 0 || x >= game.board.sizex || y < 0 || y >= game.board.sizey){
 		this.valid = false;
 	}
+}
+
+function Square (colour, range) {
+	if (!colour){
+		this.colour = Math.floor(Math.random()*range);
+	} else {
+		this.colour = colour;
+	}
+	this.marked = false;
+	this.owner = -1;
 }
 
 function Player (name, aiLevel) {
@@ -35,27 +67,17 @@ function Player (name, aiLevel) {
 	this.aiLevel = aiLevel;
 	this.x = 0;
 	this.y = 0;
-	if (players.length == 1) {
-		this.x = board.sizex - 1;
-		this.y = board.sizey - 1;
+	if (game.players.length == 1) {
+		this.x = game.board.sizex - 1;
+		this.y = game.board.sizey - 1;
 	}
-	this.colour = board.grid[this.y][this.x];
-	board.grid[this.y][this.x].owner = players.length + 1;
+	this.colour = game.board.grid[this.y][this.x].colour;
+	game.board.grid[this.y][this.x].owner = game.players.length + 1;
 }
 
-function Square (colour, range) {
-	if (!colour){
-		this.colour = Math.floor(Math.random()*range);
-	} else {
-		this.colour = colour;
-	}
-	this.marked = false;
-	this.owner = -1;
-}
-
-function Board (sizex, sizey, colourNum){
-	if (!colourNum){
-		colourNum = 6;
+function Board (sizex, sizey, numColours){
+	if (!numColours){
+		numColours = pallet.length;
 	}
 	if (!sizex){
 		sizex = 20;
@@ -65,12 +87,12 @@ function Board (sizex, sizey, colourNum){
 	}
 	this.sizex = sizex;
 	this.sizey = sizey;
-	this.colourNum = colourNum;
+	this.numColours = numColours;
 	this.grid = [];
 	for (var i = 0; i < sizey; i++){
 		this.grid[i] = [];
 		for (var j = 0; j < sizex; j++){
-			this.grid[i][j] = new Square(null, colourNum);
+			this.grid[i][j] = new Square(null, numColours);
 		}
 	}
 }
@@ -108,112 +130,168 @@ Board.prototype.drawSquare = function (x,y) {
 }
 
 Board.prototype.move = function (playerNum, colour) {
-	if (canMove == false){
+	console.log("move called",playerNum,colour);
+	if (game.canMove == false){
 		return;
 	}
-	canMove =false;
+	if (colour == game.players[0].colour || colour == game.players[1].colour){
+		return;
+	}
+	game.canMove = false;
 	if (colour == null){
-		colour = Math.floor(Math.random()*6);
-		while (colour == players[0].colour || colour == players[1].colour){
-			colour = Math.floor(Math.random()*6);
+		colour = Math.floor(Math.random()*game.board.numColours);
+		while (colour == game.players[0].colour || colour == game.players[1].colour){
+			colour = Math.floor(Math.random()*game.board.numColours);
 		}
 	}
-	board.unmarkAll();
-	oldColour = players[playerNum].colour;
+	game.board.unmarkAll();
+	game.oldColour = game.players[playerNum].colour;
 	newColour = colour;
-	workingPlayer = playerNum;
-	floodQueue.push(new Coord(players[playerNum].x,players[playerNum].y));
+	game.workingPlayer = playerNum;
+	game.floodQueue.push(new Coord(game.players[playerNum].x,game.players[playerNum].y));
+	drawQueue.push(new Coord(game.players[playerNum].x,game.players[playerNum].y));
 
-	console.log('inside move', floodQueue);
-	flood();			
-
-}
-
-function init() {
-	var canvas = $('#canvas').get(0);
-	if (!canvas.getContext){
-		return;
-	}
-	ctx = canvas.getContext('2d');
-	board = new Board(68,31);
-	players[0] = new Player("Ryan",0);
-	players[1] = new Player(null,1);
-	display();
-	board.move(0);
-}
-
-function display() {
-	board.display();
-	displayBottom();
-}
-
-function displayBottom() {
+	flood();
 
 }
 
+/* * * * * * * * * * * * * * *
+ * Additional business logic *
+ * * * * * * * * * * * * * * */
 function canChange (c, owned) {
-	if (c.valid && board.grid[c.y][c.x].marked == false 
-	&& ((owned && board.grid[c.y][c.x].colour == oldColour) || board.grid[c.y][c.x].colour == newColour)){
+	if (c.valid && 
+		((owned && game.board.grid[c.y][c.x].colour == game.oldColour) || 
+			game.board.grid[c.y][c.x].colour == newColour)){
 		return true;
 
 	}
 	return false;
 }
 
-function flood () {
-	console.log("flood has been called", floodQueue);
-	var count = floodQueue.length;
-	while (count > 0){
-		var current = floodQueue.shift();
-		var c;
-		board.grid[current.y][current.x].colour = newColour;
-		board.grid[current.y][current.x].marked = true;
-		board.drawSquare(current.x,current.y);
-		var owned = false;
-		if (board.grid[current.y][current.x].owner == workingPlayer){
-			owned = true;
-		}
-		c = new Coord(current.x+1,current.y);
-		if (canChange(c, owned)){
-			floodQueue.push(c);
-			board.grid[c.y][c.x].marked = true;
-		}
-		c = new Coord(current.x,current.y+1);
-		if (canChange(c, owned)){
-			floodQueue.push(c);
-			board.grid[c.y][c.x].marked = true;
-		}
-		c = new Coord(current.x-1,current.y);
-		if (canChange(c, owned)){
-			floodQueue.push(c);
-			board.grid[c.y][c.x].marked = true;
-		}
-		c = new Coord(current.x,current.y-1);
-		if (canChange(c, owned)){
-			floodQueue.push(c);
-			board.grid[c.y][c.x].marked = true;
-		}
-		count--;
-	}
-	if (floodQueue.length > 0){
-		console.log('setTimeout called', floodQueue);
-		setTimeout(flood,15);
-	}else{
-		console.log('aftermath', floodQueue, 'length', floodQueue.length);
-		aftermath();
+function addNode (c, owned) {
+	if (canChange(c, owned) && game.board.grid[c.y][c.x].marked == false){
+		game.floodQueue.push(c);
+		drawQueue.push(c);
+		game.board.grid[c.y][c.x].marked = true;
 	}
 }
 
-function aftermath() {
-	players[workingPlayer].colour = newColour;
-	board.ownMarked(workingPlayer);
-	canMove = true;
-	if (repeater){
-		if (workingPlayer == 1){
-			workingPlayer = 0;
-		} else {
-			workingPlayer = 1;
+function flood () {
+	while (game.floodQueue.length > 0) {
+		var count = game.floodQueue.length;
+		while (count > 0){
+			var current = game.floodQueue.shift();
+			var c;
+			game.board.grid[current.y][current.x].colour = newColour;
+			game.board.grid[current.y][current.x].marked = true;
+			//game.board.drawSquare(current.x,current.y);
+			var owned = false;
+			if (game.board.grid[current.y][current.x].owner == game.workingPlayer){
+				owned = true;
+			}
+			c = new Coord(current.x+1,current.y);
+			addNode(c, owned);
+			c = new Coord(current.x,current.y+1);
+			addNode(c, owned);
+			c = new Coord(current.x-1,current.y);
+			addNode(c, owned);
+			c = new Coord(current.x,current.y-1);
+			addNode(c, owned);
+			count--;
 		}
-		setTimeout(function() { board.move(workingPlayer); }, 10);
+		//set the draw loop to stop drawing that wave for a delay
+		drawQueue.push(null);
+	}
+	drawLoop();
+}
+
+function drawLoop() {
+	while (drawQueue.length > 0) {
+		var current = drawQueue.shift();
+		if (current != null) {
+			game.board.drawSquare(current.x,current.y);
+		} else {
+			break;
+		}
+	}
+	if (drawQueue.length > 0) {
+		setTimeout(drawLoop,20);
+	} else {
+		aftermath();
+		if (game.repeater) {
+			setTimeout(function() { game.board.move(game.workingPlayer); }, 10);
+		}
+	}
+	return;
+}
+
+function aftermath() {
+	game.players[game.workingPlayer].colour = newColour;
+	game.board.ownMarked(game.workingPlayer);
+	game.canMove = true;
+	if (game.workingPlayer == 1){
+		game.workingPlayer = 0;
+	} else {
+		game.workingPlayer = 1;
+	}
+	if (game.repeater || game.workingPlayer == 1){
+		setTimeout(function() { game.board.move(game.workingPlayer); }, 10);
+	}else {
+		displayBottom();
+	}
+	displayBottom();
+}
+
+function display() {
+	game.board.display();
+	displayBottom();
+}
+
+function displayBottom() {
+	for (var i = 0; i < game.board.numColours; i++) {
+		ctx.fillStyle = pallet[i];
+		ctx.fillRect(15+60*i, ysize*game.board.sizey + offy + 20, 40, 40);
+		if (i == game.players[0].colour || i == game.players[1].colour) {
+			ctx.lineWidth = 5;
+			ctx.lineCap = "round";
+			ctx.strokeStyle = "#CCC";
+			drawCrossOut(i);
+			ctx.lineWidth = 2;
+			ctx.lineCap = "round";
+			ctx.strokeStyle = "black";
+			drawCrossOut(i);
+		}
 	}
 }
+
+function drawCrossOut (i) {
+	ctx.beginPath();
+	ctx.moveTo(25+60*i, ysize*game.board.sizey + offy + 30);
+	ctx.lineTo(45+60*i, ysize*game.board.sizey + offy + 50);
+	ctx.stroke();
+	ctx.arc(35+60*i, ysize*game.board.sizey + offy + 40, 15, Math.PI/4, Math.PI/4 + 2*Math.PI, true);
+	ctx.stroke();
+}
+
+
+/* * * * * * * * * * *
+ * Action Listeners  *
+ * * * * * * * * * * */
+
+$(document).ready(function() {
+	$('#canvas').click(function (e) {
+		var y = e.offsetY;
+		var x = e.offsetX;
+		if (y > ysize*game.board.sizey + offy + 20 && y < ysize*game.board.sizey + offy + 60) {
+			var pos = x - 15;
+			if (pos % 60 > 40) {
+				return;
+			}
+			pos = Math.floor(pos / 60);
+			if (pos < game.board.numColours) {
+				console.log(pallet,pos);
+				game.board.move(game.workingPlayer,pos);
+			}
+		}
+	});
+});
