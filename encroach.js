@@ -2,7 +2,7 @@
 var ctx;
 var xsize = 20;
 var ysize = 20;
-var offy = 0;
+var offy = 50;
 //var pallet = ["#FF0000","#0000FF","#00C200","#FF8000","#FFFF00","#8A00B8"];
 var pallet = ["#0000C7","#C700C7","#C70000","#C7C700","#00C700","#00C7C7"];
 var drawQueue = [];
@@ -73,6 +73,7 @@ function Player (name, aiLevel) {
 	}
 	this.colour = game.board.grid[this.y][this.x].colour;
 	game.board.grid[this.y][this.x].owner = game.players.length + 1;
+	this.score = 1;
 }
 
 function Board (sizex, sizey, numColours){
@@ -106,13 +107,29 @@ Board.prototype.unmarkAll = function () {
 }
 
 Board.prototype.ownMarked = function (playerNum) {
+	game.players[playerNum].score = 0;	
 	for (var i = 0; i < this.sizey; i++){
 		for (var j = 0; j < this.sizex; j++){
 			if (this.grid[i][j].marked == true) {
+				game.players[playerNum].score++;
 				this.grid[i][j].owner = playerNum;
 			}
 		}
 	}
+}
+
+Board.prototype.takeNeutral = function (playerNum) {
+	for (var i = 0; i < this.sizey; i++){
+		for (var j = 0; j < this.sizex; j++){
+			if (this.grid[i][j].owner == -1) {
+				game.players[playerNum].score++;
+				this.grid[i][j].owner = playerNum;
+				this.grid[i][j].colour = game.players[playerNum].colour;
+			}
+		}
+	}
+	game.board.display();
+	drawScoreBar();
 }
 
 Board.prototype.display = function () {
@@ -148,9 +165,8 @@ Board.prototype.move = function (playerNum, colour) {
 	game.oldColour = game.players[playerNum].colour;
 	newColour = colour;
 	game.workingPlayer = playerNum;
-	game.floodQueue.push(new Coord(game.players[playerNum].x,game.players[playerNum].y));
-	drawQueue.push(new Coord(game.players[playerNum].x,game.players[playerNum].y));
-
+	c = new Coord(game.players[playerNum].x,game.players[playerNum].y);
+	addNode(c, true);
 	flood();
 
 }
@@ -205,6 +221,53 @@ function flood () {
 	drawLoop();
 }
 
+function aftermath() {
+	game.players[game.workingPlayer].colour = newColour;
+	game.board.ownMarked(game.workingPlayer);
+	drawScoreBar();
+	game.canMove = true;
+	if (game.workingPlayer == 1){
+		game.workingPlayer = 0;
+	} else {
+		game.workingPlayer = 1;
+	}
+	if (game.repeater || game.workingPlayer == 1){
+		setTimeout(function() { game.board.move(game.workingPlayer); }, 10);
+	}else {
+		displayBottom();
+	}
+	var winner = whoWon();
+	if (winner != -1) { 
+		drawWin(winner);
+	}
+}
+
+function whoWon() {
+	if (game.players[0].score + game.players[1].score >= game.board.sizex * game.board.sizey ||
+			game.players[0].score > (game.board.sizex * game.board.sizey)/2 ||
+			game.players[1].score > (game.board.sizex * game.board.sizey)/2) {
+		if (game.players[0].score > game.players[1].score) {
+			var winner = 0;
+		} else {
+			var winner = 1;
+		}
+		return winner;
+	}
+	else { 
+		return -1;
+	}
+}
+
+/* * * * * * * * * * *
+ * Display Functions *
+ * * * * * * * * * * */
+
+function display() {
+	drawScoreBar();
+	game.board.display();
+	displayBottom();
+}
+
 function drawLoop() {
 	while (drawQueue.length > 0) {
 		var current = drawQueue.shift();
@@ -223,28 +286,6 @@ function drawLoop() {
 		}
 	}
 	return;
-}
-
-function aftermath() {
-	game.players[game.workingPlayer].colour = newColour;
-	game.board.ownMarked(game.workingPlayer);
-	game.canMove = true;
-	if (game.workingPlayer == 1){
-		game.workingPlayer = 0;
-	} else {
-		game.workingPlayer = 1;
-	}
-	if (game.repeater || game.workingPlayer == 1){
-		setTimeout(function() { game.board.move(game.workingPlayer); }, 10);
-	}else {
-		displayBottom();
-	}
-	displayBottom();
-}
-
-function display() {
-	game.board.display();
-	displayBottom();
 }
 
 function displayBottom() {
@@ -273,6 +314,24 @@ function drawCrossOut (i) {
 	ctx.stroke();
 }
 
+function drawScoreBar() {
+	ctx.fillStyle = "grey";
+	ctx.fillRect(10,10,480,30);
+	var leftWidth =  Math.ceil((game.players[0].score/(game.board.sizex * game.board.sizey)) * 480);
+	var rightWidth = Math.floor((game.players[1].score/(game.board.sizex * game.board.sizey)) * 480);
+	ctx.fillStyle = pallet[game.players[0].colour];
+	ctx.fillRect(10,10,leftWidth,30);
+	ctx.fillStyle = pallet[game.players[1].colour];
+	ctx.fillRect(490 - rightWidth,10,rightWidth,30);
+}
+
+function drawWin(winner) {
+	game.canMove = false;
+	game.board.takeNeutral(winner);
+	ctx.fillStyle = "black";
+	ctx.font = "24pt Impact";
+	ctx.fillText("PLAYER " + (winner+1) + " WINS!", 50, 450);
+}
 
 /* * * * * * * * * * *
  * Action Listeners  *
