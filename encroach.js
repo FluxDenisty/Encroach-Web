@@ -205,14 +205,10 @@ function flood () {
 			if (game.board.grid[current.y][current.x].owner == game.workingPlayer){
 				owned = true;
 			}
-			c = new Coord(current.x+1,current.y);
-			addNode(c, owned);
-			c = new Coord(current.x,current.y+1);
-			addNode(c, owned);
-			c = new Coord(current.x-1,current.y);
-			addNode(c, owned);
-			c = new Coord(current.x,current.y-1);
-			addNode(c, owned);
+			addNode(new Coord(current.x+1,current.y), owned);
+			addNode(new Coord(current.x,current.y+1), owned);
+			addNode(new Coord(current.x-1,current.y), owned);
+			addNode(new Coord(current.x,current.y-1), owned);
 			count--;
 		}
 		//set the draw loop to stop drawing that wave for a delay
