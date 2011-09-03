@@ -163,7 +163,7 @@ Board.prototype.move = function (playerNum, colour) {
 	}
 	game.board.unmarkAll();
 	game.oldColour = game.players[playerNum].colour;
-	newColour = colour;
+	game.nextColour = colour;
 	game.workingPlayer = playerNum;
 	c = new Coord(game.players[playerNum].x,game.players[playerNum].y);
 	addNode(c, true);
@@ -175,40 +175,38 @@ Board.prototype.move = function (playerNum, colour) {
  * Additional business logic *
  * * * * * * * * * * * * * * */
 function canChange (c, owned) {
-	if (c.valid && 
+	return (c.valid && 
 		((owned && game.board.grid[c.y][c.x].colour == game.oldColour) || 
-			game.board.grid[c.y][c.x].colour == newColour)){
-		return true;
-
-	}
-	return false;
+			game.board.grid[c.y][c.x].colour == game.nextColour));
 }
 
-function addNode (c, owned) {
-	if (canChange(c, owned) && game.board.grid[c.y][c.x].marked == false){
+function addNode (c, owned, check) {
+	if (typeof check === "undefined") {
+		check = canChange;
+	}
+	if (check(c, owned) && game.board.grid[c.y][c.x].marked == false){
 		game.floodQueue.push(c);
 		drawQueue.push(c);
 		game.board.grid[c.y][c.x].marked = true;
 	}
 }
 
-function flood () {
+function flood (compare) {
 	while (game.floodQueue.length > 0) {
 		var count = game.floodQueue.length;
 		while (count > 0){
 			var current = game.floodQueue.shift();
-			var c;
-			game.board.grid[current.y][current.x].colour = newColour;
+			game.board.grid[current.y][current.x].colour = game.nextColour;
 			game.board.grid[current.y][current.x].marked = true;
 			//game.board.drawSquare(current.x,current.y);
 			var owned = false;
 			if (game.board.grid[current.y][current.x].owner == game.workingPlayer){
 				owned = true;
 			}
-			addNode(new Coord(current.x+1,current.y), owned);
-			addNode(new Coord(current.x,current.y+1), owned);
-			addNode(new Coord(current.x-1,current.y), owned);
-			addNode(new Coord(current.x,current.y-1), owned);
+			addNode(new Coord(current.x+1,current.y), owned, compare);
+			addNode(new Coord(current.x,current.y+1), owned, compare);
+			addNode(new Coord(current.x-1,current.y), owned, compare);
+			addNode(new Coord(current.x,current.y-1), owned, compare);
 			count--;
 		}
 		//set the draw loop to stop drawing that wave for a delay
@@ -218,7 +216,7 @@ function flood () {
 }
 
 function aftermath() {
-	game.players[game.workingPlayer].colour = newColour;
+	game.players[game.workingPlayer].colour = game.nextColour;
 	game.board.ownMarked(game.workingPlayer);
 	drawScoreBar();
 	game.canMove = true;
